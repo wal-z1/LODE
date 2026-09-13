@@ -1,4 +1,7 @@
 from fastapi import FastAPI
 
+app = FastAPI()
 
-app = FastAPI(title="LODE HTTP Analyzer")
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
