@@ -1,7 +1,10 @@
 from fastapi import FastAPI
-
+import httpx
 app = FastAPI()
+
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "You have just accessed the root"}
+
+
