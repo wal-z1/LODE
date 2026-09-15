@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AnalysisMode } from "@/lib/types";
 
+const RAW_HEADERS_EXAMPLE = `Content-Type: text/html
+Strict-Transport-Security: max-age=31536000
+Content-Security-Policy: default-src 'self'`;
+
 interface AnalyzerInputProps {
 	loading: boolean;
 	onSubmit: (mode: AnalysisMode, value: string) => void;
@@ -12,10 +16,13 @@ interface AnalyzerInputProps {
 function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 	const [mode, setMode] = useState<AnalysisMode>("url");
 	const [value, setValue] = useState("");
+	const [scheme, setScheme] = useState<"http" | "https">("https");
 
 	function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		onSubmit(mode, value.trim());
+		const input = value.trim();
+		const url = input.replace(/^https?:\/\//i, "");
+		onSubmit(mode, mode === "url" ? `${scheme}://${url}` : input);
 	}
 
 	return (
@@ -27,7 +34,7 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 						type="button"
 						onClick={() => {
 							setMode(option);
-							setValue("");
+							setValue(option === "raw_headers" ? RAW_HEADERS_EXAMPLE : "");
 						}}
 						className={`border-b-2 px-2.5 py-2 text-xs uppercase tracking-[0.12em] transition-colors ${
 							mode === option
@@ -41,20 +48,32 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 
 			<div className="flex flex-col gap-2 sm:flex-row">
 				{mode === "url" ? (
-					<Input
-						value={value}
-						onChange={(event) => setValue(event.target.value)}
-						type="url"
-						placeholder="https://example.com"
-						aria-label="Website URL"
-						disabled={loading}
-						className="h-9 flex-1"
-					/>
+					<>
+						<select
+							value={scheme}
+							onChange={(event) =>
+								setScheme(event.target.value as "http" | "https")
+							}
+							aria-label="URL scheme"
+							disabled={loading}
+							className="h-9 border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50">
+							<option value="https">https://</option>
+							<option value="http">http://</option>
+						</select>
+						<Input
+							value={value}
+							onChange={(event) => setValue(event.target.value)}
+							type="text"
+							placeholder="example.com"
+							aria-label="Website address"
+							disabled={loading}
+							className="h-9 flex-1"
+						/>
+					</>
 				) : (
 					<textarea
 						value={value}
 						onChange={(event) => setValue(event.target.value)}
-						placeholder="HTTP/1.1 200 OK\nContent-Security-Policy: default-src 'self'"
 						aria-label="Raw response headers"
 						disabled={loading}
 						className="min-h-24 flex-1 resize-y border border-input bg-transparent px-2.5 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50"
