@@ -1,8 +1,10 @@
 import ipaddress
 import re
 import socket
+from urllib.parse import urljoin
 
 import httpx
+
 
 
 BLOCKED_HOSTNAMES = frozenset({
@@ -245,15 +247,44 @@ def validate_anti_ssrf_req(url: str) -> bool:
         return False
 
 
+
+
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+MAX_REDIRECTS = 5
+
+
 async def fetch_headers(url: str) -> dict:
-    if not validate_anti_ssrf_req(url):
-        raise ValueError("URL rejected by SSRF guard")
+    current_url = url
 
     async with httpx.AsyncClient(
         timeout=10.0,
         follow_redirects=False,
-        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0"},
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) "
+                "Gecko/20100101 Firefox/152.0"
+            )
+        },
     ) as client:
-        r = await client.get(url)
-        r.raise_for_status()
-    return dict(r.headers)
+
+        for _ in range(MAX_REDIRECTS + 1):
+            if not validate_anti_ssrf_req(current_url):
+                raise ValueError("URL rejected by SSRF guard")
+
+            r = await client.get(current_url)
+
+            if r.status_code in REDIRECT_STATUSES:
+                location = r.headers.get("location")
+
+                if not location:
+                    raise ValueError(
+                        f"Redirect {r.status_code} has no Location header"
+                    )
+                current_url = urljoin(str(r.url), location)
+                continue
+
+            r.raise_for_status()
+
+            return dict(r.headers)
+
+    raise ValueError("Too many redirects")
