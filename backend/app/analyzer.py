@@ -25,6 +25,7 @@ def check_hsts(headers: dict) -> Finding | None:
     if not raw:
         return Finding(
             id="hsts_missing",
+            control="hsts",
             title="HSTS Header Missing",
             severity=Severity.high,
             status=Status.fail,
@@ -56,6 +57,7 @@ def check_hsts(headers: dict) -> Finding | None:
     if "max-age" not in directives:
         return Finding(
             id="hsts_max_age_missing",
+            control="hsts",
             title="HSTS max-age Missing",
             severity=Severity.high,
             status=Status.fail,
@@ -73,6 +75,7 @@ def check_hsts(headers: dict) -> Finding | None:
     except (TypeError, ValueError):
         return Finding(
             id="hsts_max_age_invalid",
+            control="hsts",
             title="HSTS max-age Invalid",
             severity=Severity.high,
             status=Status.fail,
@@ -89,6 +92,7 @@ def check_hsts(headers: dict) -> Finding | None:
     if max_age <= 0:
         return Finding(
             id="hsts_disabled",
+            control="hsts",
             title="HSTS Disabled",
             severity=Severity.high,
             status=Status.fail,
@@ -104,6 +108,7 @@ def check_hsts(headers: dict) -> Finding | None:
     elif max_age < 31536000:
         return Finding(
             id="hsts_max_age_short",
+            control="hsts",
             title="HSTS max-age Is Short",
             severity=Severity.low,
             status=Status.fail,
@@ -119,6 +124,7 @@ def check_hsts(headers: dict) -> Finding | None:
     elif "includesubdomains" not in directives:
         return Finding(
             id="hsts_subdomains_missing",
+            control="hsts",
             title="HSTS Does Not Include Subdomains",
             severity=Severity.low,
             status=Status.fail,
@@ -143,6 +149,7 @@ def check_csp(headers: dict) -> Finding | None:
     if not raw:
         return Finding(
             id="csp_missing",
+            control="csp",
             title="Content Security Policy (CSP) Header Missing",
             severity=Severity.high,
             status=Status.fail,
@@ -184,6 +191,7 @@ def check_csp(headers: dict) -> Finding | None:
     if effective_script_sources is None:
         return Finding(
             id="csp_script_policy_missing",
+            control="csp",
             title="CSP Does Not Restrict Script Sources",
             severity=Severity.high,
             status=Status.fail,
@@ -209,6 +217,7 @@ def check_csp(headers: dict) -> Finding | None:
     if "*" in effective_script_sources:
         return Finding(
             id="csp_script_wildcard",
+            control="csp",
             title="CSP Allows Scripts From Any Origin",
             severity=Severity.high,
             status=Status.fail,
@@ -226,6 +235,7 @@ def check_csp(headers: dict) -> Finding | None:
     elif "'unsafe-inline'" in effective_script_sources and not has_nonce_or_hash:
         return Finding(
             id="csp_unsafe_inline",
+            control="csp",
             title="CSP Allows Unsafe Inline Scripts",
             severity=Severity.medium,
             status=Status.fail,
@@ -244,6 +254,7 @@ def check_csp(headers: dict) -> Finding | None:
     elif "'unsafe-eval'" in effective_script_sources:
         return Finding(
             id="csp_unsafe_eval",
+            control="csp",
             title="CSP Allows Unsafe JavaScript Evaluation",
             severity=Severity.medium,
             status=Status.fail,
@@ -269,6 +280,7 @@ def check_content_type_options(headers: dict) -> Finding | None:
     if not raw:
         return Finding(
             id="x_content_type_options_missing",
+            control="content_type_options",
             title="X-Content-Type-Options Header Missing",
             severity=Severity.medium,
             status=Status.fail,
@@ -285,6 +297,7 @@ def check_content_type_options(headers: dict) -> Finding | None:
     elif raw.strip().lower() != "nosniff":
         return Finding(
             id="x_content_type_options_invalid",
+            control="content_type_options",
             title="X-Content-Type-Options Header Invalid",
             severity=Severity.medium,
             status=Status.fail,
@@ -325,6 +338,7 @@ def check_frame_protection(headers: dict) -> Finding | None:
     elif frame_ancestors and "*" in frame_ancestors:
         return Finding(
             id="frame_ancestors_wildcard",
+            control="frame_protection",
             title="CSP Allows Framing From Any Origin",
             severity=Severity.medium,
             status=Status.fail,
@@ -344,6 +358,7 @@ def check_frame_protection(headers: dict) -> Finding | None:
     elif xfo_raw:
         return Finding(
             id="x_frame_options_invalid",
+            control="frame_protection",
             title="X-Frame-Options Header Invalid",
             severity=Severity.medium,
             status=Status.fail,
@@ -362,6 +377,7 @@ def check_frame_protection(headers: dict) -> Finding | None:
     else:
         return Finding(
             id="frame_protection_missing",
+            control="frame_protection",
             title="Frame Protection Missing",
             severity=Severity.medium,
             status=Status.fail,
@@ -404,6 +420,7 @@ def check_referrer_policy(headers: dict) -> Finding | None:
     if not raw:
         return Finding(
             id="referrer_policy_missing",
+            control="referrer_policy",
             title="Referrer-Policy Header Missing",
             severity=Severity.low,
             status=Status.fail,
@@ -434,6 +451,7 @@ def check_referrer_policy(headers: dict) -> Finding | None:
     if not supported:
         return Finding(
             id="referrer_policy_invalid",
+            control="referrer_policy",
             title="Referrer-Policy Header Invalid",
             severity=Severity.medium,
             status=Status.fail,
@@ -454,6 +472,7 @@ def check_referrer_policy(headers: dict) -> Finding | None:
     if effective_policy == "unsafe-url":
         return Finding(
             id="referrer_policy_unsafe_url",
+            control="referrer_policy",
             title="Referrer-Policy Exposes Full URLs",
             severity=Severity.medium,
             status=Status.fail,
@@ -473,6 +492,7 @@ def check_referrer_policy(headers: dict) -> Finding | None:
     elif effective_policy not in strong_policies:
         return Finding(
             id="referrer_policy_weak",
+            control="referrer_policy",
             title="Referrer-Policy Could Be More Restrictive",
             severity=Severity.low,
             status=Status.fail,
@@ -499,6 +519,7 @@ def check_permissions_policy(headers: dict) -> Finding | None:
     if not raw:
         return Finding(
             id="permissions_policy_missing",
+            control="permissions_policy",
             title="Permissions-Policy Header Missing",
             severity=Severity.low,
             status=Status.fail,
@@ -542,6 +563,7 @@ def check_permissions_policy(headers: dict) -> Finding | None:
     if unrestricted:
         return Finding(
             id="permissions_policy_sensitive_wildcard",
+            control="permissions_policy",
             title="Permissions-Policy Allows Sensitive Features From Any Origin",
             severity=Severity.medium,
             status=Status.fail,
@@ -579,6 +601,7 @@ def check_cookies(headers: dict) -> list[Finding]:
             findings.append(
                 Finding(
                     id=f"cookie_{name}_missing_secure",
+                    control="cookies",
                     title=f"Cookie '{name}' Missing Secure Attribute",
                     severity=Severity.medium,
                     status=Status.fail,
@@ -596,6 +619,7 @@ def check_cookies(headers: dict) -> list[Finding]:
             findings.append(
                 Finding(
                     id=f"cookie_{name}_missing_httponly",
+                    control="cookies",
                     title=f"Cookie '{name}' Missing HttpOnly Attribute",
                     severity=Severity.medium,
                     status=Status.fail,
@@ -616,6 +640,7 @@ def check_cors(headers: dict) -> Finding | None:
     if "access-control-allow-origin" not in headers:
         return Finding(
             id="cors_missing",
+            control="cors",
             title="CORS Header Missing",
             severity=Severity.low,
             status=Status.fail,
@@ -633,6 +658,7 @@ def check_cors(headers: dict) -> Finding | None:
     if "allow-control-allow-credentials" in headers and headers.get("access-control-allow-origin") == "*":
         return Finding(
             id="cors_wildcard_with_credentials",
+            control="cors",
             title="CORS Allows Any Origin With Credentials",
             severity=Severity.high,
             status=Status.fail,
@@ -656,6 +682,7 @@ def check_server_header(headers: dict) -> Finding | None:
     if value:
         return Finding(
             id="server_header_disclosure",
+            control="server_header",
             title="Server Header Exposes Server Information",
             severity=Severity.low,
             status=Status.fail,
@@ -672,6 +699,7 @@ def check_powered_by(headers: dict) -> Finding | None:
     if value:
         return Finding(
             id="powered_by_disclosure",
+            control="powered_by",
             title="X-Powered-By Header Exposes Technology",
             severity=Severity.low,
             status=Status.fail,
@@ -688,6 +716,7 @@ def check_aspnet_version(headers: dict) -> Finding | None:
     if value:
         return Finding(
             id="aspnet_version_disclosure",
+            control="aspnet_version",
             title="ASP.NET Version Exposed",
             severity=Severity.low,
             status=Status.fail,
@@ -702,6 +731,7 @@ def check_coop(headers: dict) -> Finding | None:
     if "cross-origin-opener-policy" not in headers:
         return Finding(
             id="coop_missing",
+            control="coop",
             title="Cross-Origin-Opener-Policy Missing",
             severity=Severity.low,
             status=Status.fail,
@@ -716,6 +746,7 @@ def check_coep(headers: dict) -> Finding | None:
     if "cross-origin-embedder-policy" not in headers:
         return Finding(
             id="coep_missing",
+            control="coep",
             title="Cross-Origin-Embedder-Policy Missing",
             severity=Severity.low,
             status=Status.fail,
@@ -730,6 +761,7 @@ def check_corp(headers: dict) -> Finding | None:
     if "cross-origin-resource-policy" not in headers:
         return Finding(
             id="corp_missing",
+            control="corp",
             title="Cross-Origin-Resource-Policy Missing",
             severity=Severity.low,
             status=Status.fail,
@@ -744,6 +776,7 @@ def check_cache_control(headers: dict) -> Finding | None:
     if "cache-control" not in headers:
         return Finding(
             id="cache_control_missing",
+            control="cache_control",
             title="Cache-Control Header Missing",
             severity=Severity.low,
             status=Status.fail,
@@ -758,6 +791,7 @@ def check_content_type(headers: dict) -> Finding | None:
     if "content-type" not in headers:
         return Finding(
             id="content_type_missing",
+            control="content_type",
             title="Content-Type Header Missing",
             severity=Severity.low,
             status=Status.fail,

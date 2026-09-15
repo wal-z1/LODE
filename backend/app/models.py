@@ -14,6 +14,7 @@ class Status(str, Enum):
 
 class Finding(BaseModel):
     id: str
+    control: str
     title: str
     severity: Severity
     status: Status
