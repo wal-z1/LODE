@@ -1,7 +1,5 @@
 
-from fastapi import APIRouter
-
-from backend.app.models import Finding, Severity, Status
+from .models import Finding, Severity, Status
 
 
 def finding(id, title, severity, status, detail, remediation, url=None, raw_headers=None):
@@ -655,7 +653,7 @@ def check_cors(headers: dict) -> Finding | None:
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS",
             raw_headers=None,
         )
-    if "allow-control-allow-credentials" in headers and headers.get("access-control-allow-origin") == "*":
+    if "access-control-allow-credentials" in headers and headers.get("access-control-allow-origin") == "*":
         return Finding(
             id="cors_wildcard_with_credentials",
             control="cors",

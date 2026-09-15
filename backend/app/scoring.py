@@ -1,6 +1,4 @@
-from enum import Enum
-
-from backend.app.models import Finding, Severity, Status
+from .models import Finding, Severity
 
 CONTROL_WEIGHTS = {
     "csp": 20,
@@ -23,7 +21,7 @@ SEVERITY_PENALTY = {
 }
 
 
-def saverity_summary(findings: list[Finding]) -> dict[Severity, int]:
+def severity_summary(findings: list[Finding]) -> dict[Severity, int]:
     summary = {severity: 0 for severity in Severity}
     for finding in findings:
         summary[finding.severity] += 1
@@ -39,7 +37,7 @@ def calc_score(findings: list[Finding]) -> float:
 def report_summary(findings: list[Finding]) -> dict:
     summary = {
         "total_findings": len(findings),
-        "severity_summary": saverity_summary(findings),
+        "severity_summary": severity_summary(findings),
         "score": calc_score(findings),
     }
     return summary

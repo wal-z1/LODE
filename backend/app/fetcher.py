@@ -252,7 +252,7 @@ async def fetch_headers(url: str) -> dict:
     async with httpx.AsyncClient(
         timeout=10.0,
         follow_redirects=False,
-        max_redirects=0,
     ) as client:
         r = await client.get(url)
+        r.raise_for_status()
     return dict(r.headers)
