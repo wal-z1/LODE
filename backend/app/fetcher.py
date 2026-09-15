@@ -252,6 +252,7 @@ async def fetch_headers(url: str) -> dict:
     async with httpx.AsyncClient(
         timeout=10.0,
         follow_redirects=False,
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0"},
     ) as client:
         r = await client.get(url)
         r.raise_for_status()
