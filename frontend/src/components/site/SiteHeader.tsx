@@ -8,7 +8,7 @@ type SiteHeaderProps = {
 
 const NAV_LINKS = [
 	{ href: "#overview", label: "Overview", active: true },
-	{ href: "https://github.com/wal-z1", label: "GitHub" },
+	{ href: "https://github.com/wal-z1/LODE", label: "GitHub" },
 ];
 
 function SiteHeader({ isLight, onToggleTheme }: SiteHeaderProps) {
