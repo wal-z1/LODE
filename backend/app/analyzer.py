@@ -2,6 +2,50 @@
 from .models import Finding, Severity, Status
 
 
+def parse_raw_headers(raw_headers: str) -> dict[str, str | list[str]]:
+    if not raw_headers.strip():
+        raise ValueError("Raw headers cannot be empty")
+
+    headers: dict[str, str | list[str]] = {}
+    lines = raw_headers.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    started = False
+
+    for line in lines:
+        if not line.strip():
+            if started:
+                break
+            continue
+
+        if not started and line.upper().startswith("HTTP/"):
+            started = True
+            continue
+
+        if ":" not in line:
+            raise ValueError("Each header must use the 'Name: value' format")
+
+        name, value = line.split(":", 1)
+        name = name.strip().lower()
+        value = value.strip()
+
+        if not name or not value:
+            raise ValueError("Header names and values cannot be empty")
+
+        existing = headers.get(name)
+        if existing is None:
+            headers[name] = value
+        elif isinstance(existing, list):
+            existing.append(value)
+        else:
+            headers[name] = [existing, value]
+
+        started = True
+
+    if not headers:
+        raise ValueError("No HTTP headers were found")
+
+    return headers
+
+
 def finding(id, title, severity, status, detail, remediation, url=None, raw_headers=None):
     return {
         "id": id,

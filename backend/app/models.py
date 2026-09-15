@@ -22,3 +22,21 @@ class Finding(BaseModel):
     remediation: str
     url: str | None
     raw_headers: str | None
+
+
+class AnalyzeRequest(BaseModel):
+    url: str | None = None
+    raw_headers: str | None = None
+
+
+class AnalysisSummary(BaseModel):
+    total_findings: int
+    severity_summary: dict[Severity, int]
+    score: float
+
+
+class AnalysisResponse(BaseModel):
+    url: str | None
+    score: float
+    summary: AnalysisSummary
+    findings: list[Finding]
