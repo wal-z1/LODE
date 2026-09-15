@@ -6,26 +6,48 @@ type SiteHeaderProps = {
 	onToggleTheme: () => void;
 };
 
+const NAV_LINKS = [
+	{ href: "#overview", label: "Overview", active: true },
+	{ href: "#placeholder-1", label: "Placeholder 1" },
+	{ href: "#placeholder-2", label: "Placeholder 2" },
+];
+
 function SiteHeader({ isLight, onToggleTheme }: SiteHeaderProps) {
 	return (
-		<header className="site-header">
-			<a className="brand" href="#top" aria-label="LODE home">
-				<img src="/logo.png" alt="" />
-				<span>LODE</span>
-			</a>
-			<nav className="main-nav" aria-label="Main navigation">
-				<a className="active" href="#overview">
-					Overview
-				</a>
-				<a href="#placeholder-1">Placeholder 1</a>
-				<a href="#placeholder-2">Placeholder 2</a>
+		<header className="mx-auto flex h-22 w-[calc(100%-48px)] max-w-280 items-center justify-between border-b border-border max-sm:h-18 max-sm:w-[calc(100%-32px)]">
+			<div className="inline-flex items-center gap-3 select-none">
+				<img
+					src="/logo.png"
+					alt=""
+					className="size-9 rounded-md object-cover ring-1 ring-border"
+				/>
+				<span className="text-base font-semibold tracking-tight text-foreground select-text">
+					LODE
+				</span>
+			</div>
+
+			<nav
+				aria-label="Main navigation"
+				className="ml-auto mr-7.5 flex gap-7 max-sm:hidden">
+				{NAV_LINKS.map(({ href, label, active }) => (
+					<a
+						key={href}
+						href={href}
+						className={`text-[11px] no-underline transition-colors duration-150 ${
+							active
+								? "relative text-foreground after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-px after:bg-primary after:content-['']"
+								: "text-muted-foreground hover:text-foreground"
+						}`}>
+						{label}
+					</a>
+				))}
 			</nav>
 			<Button
-				className="theme-button"
 				variant="outline"
 				size="icon"
 				onClick={onToggleTheme}
-				aria-label={isLight ? "Use dark mode" : "Use light mode"}>
+				aria-label={isLight ? "Use dark mode" : "Use light mode"}
+				className="border-border text-foreground">
 				{isLight ? <Moon weight="bold" /> : <Sun weight="bold" />}
 			</Button>
 		</header>
