@@ -1,8 +1,10 @@
+
 from fastapi import APIRouter
 
-from backend.app.models import Finding,Severity, Status
+from backend.app.models import Finding, Severity, Status
 
-def finding(id,title,severity,status,detail,remediation,url=None,raw_headers=None):
+
+def finding(id, title, severity, status, detail, remediation, url=None, raw_headers=None):
     return {
         "id": id,
         "title": title,
@@ -11,11 +13,16 @@ def finding(id,title,severity,status,detail,remediation,url=None,raw_headers=Non
         "detail": detail,
         "remediation": remediation,
         "url": url,
-        "raw_headers": raw_headers
+        "raw_headers": raw_headers,
     }
 
+# Checks the Strict-Transport-Security (HSTS) header.
+
+
 def check_hsts(headers: dict) -> Finding | None:
-    if "strict-transport-security" not in headers:
+    raw = headers.get("strict-transport-security")
+
+    if not raw:
         return Finding(
             id="hsts_missing",
             title="HSTS Header Missing",
@@ -23,22 +30,30 @@ def check_hsts(headers: dict) -> Finding | None:
             status=Status.fail,
             detail=(
                 "The Strict-Transport-Security (HSTS) header is missing. "
-                "Without HSTS, a user's browser may initially connect to the site over HTTP "
-                "before being redirected to HTTPS. An attacker positioned on the network could "
-                "attempt to intercept or downgrade that initial connection before HTTPS is established."
+                "Without HSTS, browsers may initially connect over HTTP before being redirected "
+                "to HTTPS, creating an opportunity for downgrade or SSL-stripping attacks."
             ),
             remediation=(
-                "Enable HSTS by adding the 'Strict-Transport-Security' response header. "
-                "For example: 'Strict-Transport-Security: max-age=31536000; includeSubDomains'. "
-                "Only enable includeSubDomains if every subdomain is available over HTTPS."
+                "Add a Strict-Transport-Security header such as "
+                "'max-age=31536000; includeSubDomains'."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security",
-            raw_headers=None
+            raw_headers=None,
         )
 
-    hsts = headers["strict-transport-security"].lower()
+    hsts = raw.lower()
 
-    if "max-age" not in hsts:
+    directives = {
+        part.split("=", 1)[0].strip(): (
+            part.split("=", 1)[1].strip()
+            if "=" in part
+            else None
+        )
+        for part in hsts.split(";")
+        if part.strip()
+    }
+
+    if "max-age" not in directives:
         return Finding(
             id="hsts_max_age_missing",
             title="HSTS max-age Missing",
@@ -46,315 +61,506 @@ def check_hsts(headers: dict) -> Finding | None:
             status=Status.fail,
             detail=(
                 "The HSTS header is present but does not define a max-age directive. "
-                "The max-age value tells the browser how long it must remember to access "
-                "the site exclusively through HTTPS. Without it, the HSTS policy is incomplete."
+                "The browser therefore does not know how long HTTPS-only enforcement should remain active."
             ),
-            remediation=(
-                "Add a max-age directive specifying how long browsers should enforce HTTPS. "
-                "For example: 'Strict-Transport-Security: max-age=31536000'."
-            ),
+            remediation="Add a max-age directive such as 'max-age=31536000'.",
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security",
-            raw_headers=headers["strict-transport-security"]
+            raw_headers=raw,
         )
 
-    if "max-age=0" in hsts:
+    try:
+        max_age = int(directives["max-age"])
+    except (TypeError, ValueError):
+        return Finding(
+            id="hsts_max_age_invalid",
+            title="HSTS max-age Invalid",
+            severity=Severity.high,
+            status=Status.fail,
+            detail=(
+                f"The HSTS max-age value '{directives['max-age']}' is invalid. "
+                "The value must be an integer representing the number of seconds "
+                "the browser should enforce HTTPS."
+            ),
+            remediation="Use a valid integer value such as 'max-age=31536000'.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security",
+            raw_headers=raw,
+        )
+
+    if max_age <= 0:
         return Finding(
             id="hsts_disabled",
             title="HSTS Disabled",
             severity=Severity.high,
             status=Status.fail,
             detail=(
-                "The HSTS policy uses max-age=0. This tells browsers to immediately stop "
-                "enforcing HSTS for the site, effectively disabling the protection and allowing "
-                "future connections to begin over HTTP again."
+                "The HSTS policy uses a non-positive max-age value. "
+                "A value of 0 removes the browser's stored HSTS policy and disables HTTPS-only enforcement."
             ),
-            remediation=(
-                "Use a positive max-age value. A commonly used value is "
-                "'max-age=31536000', which instructs browsers to enforce HTTPS for one year."
-            ),
+            remediation="Use a positive max-age value such as 'max-age=31536000'.",
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security",
-            raw_headers=headers["strict-transport-security"]
+            raw_headers=raw,
         )
 
-    if "includesubdomains" not in hsts:
+    elif max_age < 31536000:
+        return Finding(
+            id="hsts_max_age_short",
+            title="HSTS max-age Is Short",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=(
+                f"HSTS is enabled with a max-age of {max_age} seconds. "
+                "A short duration reduces how long the browser remembers to enforce HTTPS."
+            ),
+            remediation="Consider using a longer value such as 'max-age=31536000'.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security",
+            raw_headers=raw,
+        )
+
+    elif "includesubdomains" not in directives:
         return Finding(
             id="hsts_subdomains_missing",
             title="HSTS Does Not Include Subdomains",
             severity=Severity.low,
             status=Status.fail,
             detail=(
-                "HSTS is enabled for the current hostname, but it does not apply automatically "
-                "to its subdomains. A subdomain that accepts insecure HTTP connections may therefore "
-                "remain exposed to downgrade or interception attacks."
+                "HSTS protects the current hostname but does not automatically protect its subdomains. "
+                "Subdomains that allow HTTP may remain exposed to downgrade or interception attacks."
             ),
             remediation=(
-                "Consider adding the 'includeSubDomains' directive if all current and future "
-                "subdomains support HTTPS. Example: "
-                "'Strict-Transport-Security: max-age=31536000; includeSubDomains'."
+                "Consider adding 'includeSubDomains' if all subdomains support HTTPS."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security",
-            raw_headers=headers["strict-transport-security"]
+            raw_headers=raw,
         )
 
     return None
 
+# Checks the Content-Security-Policy (CSP) header.
 
 def check_csp(headers: dict) -> Finding | None:
-    if "content-security-policy" not in headers:
+    raw = headers.get("content-security-policy")
+
+    if not raw:
         return Finding(
             id="csp_missing",
             title="Content Security Policy (CSP) Header Missing",
             severity=Severity.high,
             status=Status.fail,
             detail=(
-                "The Content-Security-Policy (CSP) header is missing. CSP allows a website to "
-                "tell the browser which sources are trusted for scripts, styles, images, frames, "
-                "and other resources. Without it, injected content such as malicious JavaScript "
-                "has fewer browser-level restrictions, increasing the impact of vulnerabilities such as XSS."
+                "The Content-Security-Policy header is missing. CSP controls which scripts, styles, "
+                "frames, images, and other resources the browser is allowed to load or execute. "
+                "Without it, injected content has fewer browser-level restrictions."
             ),
             remediation=(
-                "Define a restrictive Content-Security-Policy that only allows resources from "
-                "trusted locations. A basic starting point may be \"default-src 'self'\", "
-                "then additional sources can be explicitly allowed as required by the application."
+                "Add a restrictive Content-Security-Policy such as \"default-src 'self'\" "
+                "and explicitly allow only required external sources."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-            raw_headers=None
+            raw_headers=None,
         )
 
-    csp = headers["content-security-policy"].lower()
+    directives = {}
 
-    if "default-src *" in csp:
+    for section in raw.split(";"):
+        parts = section.strip().split()
+
+        if not parts:
+            continue
+
+        name = parts[0].lower()
+
+        if name not in directives:
+            directives[name] = [value.lower() for value in parts[1:]]
+
+    default_sources = directives.get("default-src")
+    script_sources = directives.get("script-src")
+
+    effective_script_sources = (
+        script_sources
+        if script_sources is not None
+        else default_sources
+    )
+
+    if effective_script_sources is None:
         return Finding(
-            id="csp_wildcard",
-            title="CSP Uses Wildcard Sources",
+            id="csp_script_policy_missing",
+            title="CSP Does Not Restrict Script Sources",
             severity=Severity.high,
             status=Status.fail,
             detail=(
-                "The CSP uses a wildcard (*) in default-src, allowing resources to be loaded "
-                "from virtually any origin. This removes much of CSP's ability to restrict where "
-                "potentially dangerous content can come from."
+                "The CSP does not define either script-src or a default-src fallback. "
+                "JavaScript sources are therefore not meaningfully restricted by the policy."
             ),
             remediation=(
-                "Replace wildcard sources with explicitly trusted origins. For example, "
-                "use \"default-src 'self'\" and separately allow only the external domains "
-                "that the application genuinely requires."
+                "Define a restrictive script-src directive or add an appropriate default-src fallback."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-            raw_headers=headers["content-security-policy"]
+            raw_headers=raw,
         )
 
-    if "'unsafe-inline'" in csp:
+    has_nonce_or_hash = any(
+        value.startswith("'nonce-")
+        or value.startswith("'sha256-")
+        or value.startswith("'sha384-")
+        or value.startswith("'sha512-")
+        for value in effective_script_sources
+    )
+
+    if "*" in effective_script_sources:
+        return Finding(
+            id="csp_script_wildcard",
+            title="CSP Allows Scripts From Any Origin",
+            severity=Severity.high,
+            status=Status.fail,
+            detail=(
+                "The effective script policy contains '*', allowing scripts to be loaded "
+                "from arbitrary origins and significantly weakening CSP protection."
+            ),
+            remediation=(
+                "Replace wildcard sources with explicitly trusted origins, nonces, or hashes."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
+            raw_headers=raw,
+        )
+
+    elif "'unsafe-inline'" in effective_script_sources and not has_nonce_or_hash:
         return Finding(
             id="csp_unsafe_inline",
-            title="CSP Allows Unsafe Inline Content",
+            title="CSP Allows Unsafe Inline Scripts",
             severity=Severity.medium,
             status=Status.fail,
             detail=(
-                "The CSP contains 'unsafe-inline'. This can allow inline scripts or styles to execute, "
-                "depending on the directive where it is used. For scripts, this significantly weakens "
-                "CSP's protection against injected JavaScript and some forms of cross-site scripting (XSS)."
+                "The effective script policy permits 'unsafe-inline', allowing inline JavaScript "
+                "and weakening CSP protection against injected scripts and XSS."
             ),
             remediation=(
-                "Remove 'unsafe-inline' where possible. For legitimate inline scripts, use "
-                "CSP nonces or cryptographic hashes so that only explicitly authorized inline "
-                "code is allowed to execute."
+                "Remove 'unsafe-inline' and use CSP nonces or cryptographic hashes "
+                "for legitimate inline scripts."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-            raw_headers=headers["content-security-policy"]
+            raw_headers=raw,
         )
 
-    if "'unsafe-eval'" in csp:
+    elif "'unsafe-eval'" in effective_script_sources:
         return Finding(
             id="csp_unsafe_eval",
             title="CSP Allows Unsafe JavaScript Evaluation",
             severity=Severity.medium,
             status=Status.fail,
             detail=(
-                "The CSP contains 'unsafe-eval', which permits JavaScript mechanisms such as "
-                "eval() and similar dynamic code execution. If an attacker can influence data "
-                "passed into these functions, it can increase the likelihood or impact of code injection."
+                "The effective script policy contains 'unsafe-eval', allowing JavaScript "
+                "APIs that compile strings into executable code and increasing the impact "
+                "of some script-injection vulnerabilities."
             ),
             remediation=(
-                "Remove 'unsafe-eval' and avoid JavaScript features that dynamically compile "
-                "strings as executable code. Refactor affected code or libraries where possible."
+                "Remove 'unsafe-eval' and refactor code that depends on dynamic JavaScript evaluation."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-            raw_headers=headers["content-security-policy"]
-        )
-
-    if "default-src" not in csp:
-        return Finding(
-            id="csp_default_src_missing",
-            title="CSP default-src Missing",
-            severity=Severity.low,
-            status=Status.fail,
-            detail=(
-                "The CSP does not define a default-src directive. default-src acts as the fallback "
-                "policy for several resource types that do not have a more specific directive. "
-                "Without a fallback, resources not explicitly covered by other directives may be "
-                "less restricted than intended."
-            ),
-            remediation=(
-                "Add a restrictive default-src fallback such as \"default-src 'self'\" and "
-                "override it with more specific directives only where necessary."
-            ),
-            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-            raw_headers=headers["content-security-policy"]
+            raw_headers=raw,
         )
 
     return None
 
+# Checks the X-Content-Type-Options header.
 
 def check_content_type_options(headers: dict) -> Finding | None:
-    if "x-content-type-options" not in headers:
+    raw = headers.get("x-content-type-options")
+
+    if not raw:
         return Finding(
             id="x_content_type_options_missing",
             title="X-Content-Type-Options Header Missing",
             severity=Severity.medium,
             status=Status.fail,
             detail=(
-                "The X-Content-Type-Options header is missing. Without 'nosniff', browsers may "
-                "attempt to guess the type of some resources instead of strictly respecting the "
-                "server's declared Content-Type. In certain situations, attacker-controlled content "
-                "could therefore be interpreted as executable script or HTML rather than harmless data."
+                "The X-Content-Type-Options header is missing. Without 'nosniff', "
+                "browsers may attempt to guess a resource's MIME type instead of strictly "
+                "following the server's declared Content-Type."
             ),
-            remediation=(
-                "Add 'X-Content-Type-Options: nosniff' to responses and ensure that every resource "
-                "is also served with the correct Content-Type."
-            ),
+            remediation="Add 'X-Content-Type-Options: nosniff'.",
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options",
-            raw_headers=None
+            raw_headers=None,
         )
 
-    if headers["x-content-type-options"].lower() != "nosniff":
+    elif raw.strip().lower() != "nosniff":
         return Finding(
             id="x_content_type_options_invalid",
             title="X-Content-Type-Options Header Invalid",
             severity=Severity.medium,
             status=Status.fail,
             detail=(
-                f"The X-Content-Type-Options header is present but uses the invalid value "
-                f"'{headers['x-content-type-options']}'. Browsers expect the value 'nosniff'; "
-                "other values do not provide the intended MIME-sniffing protection."
+                f"The X-Content-Type-Options header contains the unsupported value '{raw}'. "
+                "The expected value is 'nosniff'."
             ),
-            remediation=(
-                "Set the header exactly to 'X-Content-Type-Options: nosniff' and ensure resources "
-                "are returned with accurate Content-Type headers."
-            ),
+            remediation="Set the header to 'X-Content-Type-Options: nosniff'.",
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options",
-            raw_headers=headers["x-content-type-options"]
+            raw_headers=raw,
         )
 
     return None
 
+# Checks framing protection using X-Frame-Options and CSP frame-ancestors.
 
 def check_frame_protection(headers: dict) -> Finding | None:
-    if "x-frame-options" not in headers:
+    xfo_raw = headers.get("x-frame-options")
+    csp_raw = headers.get("content-security-policy")
+
+    xfo = xfo_raw.strip().lower() if xfo_raw else None
+    frame_ancestors = None
+
+    if csp_raw:
+        for section in csp_raw.split(";"):
+            parts = section.strip().split()
+
+            if parts and parts[0].lower() == "frame-ancestors":
+                frame_ancestors = [value.lower() for value in parts[1:]]
+                break
+
+    if frame_ancestors and "*" not in frame_ancestors:
+        return None
+
+    elif xfo in {"deny", "sameorigin"}:
+        return None
+
+    elif frame_ancestors and "*" in frame_ancestors:
         return Finding(
-            id="x_frame_options_missing",
-            title="X-Frame-Options Header Missing",
+            id="frame_ancestors_wildcard",
+            title="CSP Allows Framing From Any Origin",
             severity=Severity.medium,
             status=Status.fail,
             detail=(
-                "The X-Frame-Options header is missing. Without frame restrictions, another website "
-                "may be able to embed this page inside an iframe. An attacker could potentially hide "
-                "or overlay the framed page with deceptive controls and trick a logged-in user into "
-                "clicking legitimate application buttons. This attack is known as clickjacking."
+                "The CSP frame-ancestors directive allows framing from any origin. "
+                "Untrusted websites may therefore be able to embed the page and use it "
+                "in clickjacking attacks."
             ),
             remediation=(
-                "Set 'X-Frame-Options: DENY' if the page should never be framed, or "
-                "'X-Frame-Options: SAMEORIGIN' if framing should only be allowed by pages "
-                "from the same origin. Modern applications should also consider CSP's "
-                "'frame-ancestors' directive."
+                "Use \"frame-ancestors 'none'\" to prevent framing or "
+                "\"frame-ancestors 'self'\" to allow only same-origin framing."
             ),
-            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options",
-            raw_headers=None
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors",
+            raw_headers=csp_raw,
         )
 
-    if headers["x-frame-options"].lower() not in ["deny", "sameorigin"]:
+    elif xfo_raw:
         return Finding(
             id="x_frame_options_invalid",
             title="X-Frame-Options Header Invalid",
             severity=Severity.medium,
             status=Status.fail,
             detail=(
-                f"The X-Frame-Options header uses the unsupported or ineffective value "
-                f"'{headers['x-frame-options']}'. As a result, the browser may not prevent "
-                "untrusted websites from embedding the page, leaving it potentially exposed "
-                "to clickjacking attacks."
+                f"The X-Frame-Options header contains the unsupported value '{xfo_raw}', "
+                "and no effective CSP frame-ancestors protection was detected."
             ),
             remediation=(
-                "Set the header to 'DENY' to prevent all framing or 'SAMEORIGIN' to allow "
-                "framing only from the same origin. For more flexible control, use the "
-                "Content-Security-Policy 'frame-ancestors' directive."
+                "Use 'X-Frame-Options: DENY', 'SAMEORIGIN', or an appropriate "
+                "CSP frame-ancestors directive."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options",
-            raw_headers=headers["x-frame-options"]
+            raw_headers=xfo_raw,
         )
 
-    return None
+    else:
+        return Finding(
+            id="frame_protection_missing",
+            title="Frame Protection Missing",
+            severity=Severity.medium,
+            status=Status.fail,
+            detail=(
+                "Neither a valid X-Frame-Options header nor a CSP frame-ancestors policy "
+                "was detected. Other websites may be able to embed the page and potentially "
+                "use it in clickjacking attacks."
+            ),
+            remediation=(
+                "Use \"frame-ancestors 'none'\", \"frame-ancestors 'self'\", "
+                "'X-Frame-Options: DENY', or 'SAMEORIGIN'."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options",
+            raw_headers=None,
+        )
+
+# Checks the Referrer-Policy header.
 
 def check_referrer_policy(headers: dict) -> Finding | None:
-    if "referrer-policy" not in headers:
+    raw = headers.get("referrer-policy")
+
+    valid_policies = {
+        "no-referrer",
+        "no-referrer-when-downgrade",
+        "origin",
+        "origin-when-cross-origin",
+        "same-origin",
+        "strict-origin",
+        "strict-origin-when-cross-origin",
+        "unsafe-url",
+    }
+
+    strong_policies = {
+        "no-referrer",
+        "same-origin",
+        "strict-origin",
+        "strict-origin-when-cross-origin",
+    }
+
+    if not raw:
         return Finding(
             id="referrer_policy_missing",
             title="Referrer-Policy Header Missing",
             severity=Severity.low,
             status=Status.fail,
             detail=(
-                "The Referrer-Policy header is missing. Without it, browsers may send the full URL "
-                "of the current page as the Referer header when navigating to other sites. This can "
-                "potentially leak sensitive information such as authentication tokens or internal paths."
+                "The site does not explicitly define a Referrer-Policy. "
+                "Although modern browsers normally use a restrictive default, defining "
+                "the policy explicitly makes referrer behavior predictable and auditable."
             ),
             remediation=(
-                "Add a Referrer-Policy header to control how much referrer information is sent. "
-                "A common choice is 'strict-origin-when-cross-origin', which sends the full URL "
-                "only for same-origin requests and only the origin for cross-origin requests."
+                "Add a policy such as 'Referrer-Policy: strict-origin-when-cross-origin'."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
-            raw_headers=None
+            raw_headers=None,
         )
-    if headers["referrer-policy"].lower() not in ["no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "same-origin", "strict-origin", "strict-origin-when-cross-origin", "unsafe-url"]:
+
+    policies = [
+        policy.strip().lower()
+        for policy in raw.split(",")
+        if policy.strip()
+    ]
+
+    supported = [
+        policy
+        for policy in policies
+        if policy in valid_policies
+    ]
+
+    if not supported:
         return Finding(
             id="referrer_policy_invalid",
             title="Referrer-Policy Header Invalid",
             severity=Severity.medium,
             status=Status.fail,
             detail=(
-                f"The Referrer-Policy header uses the unsupported or ineffective value "
-                f"'{headers['referrer-policy']}'. This may lead to unexpected behavior "
-                "regarding the amount of referrer information sent."
+                f"The Referrer-Policy value '{raw}' does not contain a recognized policy. "
+                "The browser may fall back to its default behavior."
             ),
             remediation=(
-                "Set the header to a valid value such as 'strict-origin-when-cross-origin' "
-                "to ensure proper handling of referrer information."
+                "Use a valid policy such as 'strict-origin-when-cross-origin', "
+                "'same-origin', or 'no-referrer'."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
-            raw_headers=headers["referrer-policy"]
+            raw_headers=raw,
         )
+
+    effective_policy = supported[-1]
+
+    if effective_policy == "unsafe-url":
+        return Finding(
+            id="referrer_policy_unsafe_url",
+            title="Referrer-Policy Exposes Full URLs",
+            severity=Severity.medium,
+            status=Status.fail,
+            detail=(
+                "The effective Referrer-Policy is 'unsafe-url'. This may send the full "
+                "URL path and query string to cross-origin destinations and can expose "
+                "sensitive information stored in URLs."
+            ),
+            remediation=(
+                "Use 'strict-origin-when-cross-origin', 'strict-origin', "
+                "'same-origin', or 'no-referrer'."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
+            raw_headers=raw,
+        )
+
+    elif effective_policy not in strong_policies:
+        return Finding(
+            id="referrer_policy_weak",
+            title="Referrer-Policy Could Be More Restrictive",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=(
+                f"The effective Referrer-Policy is '{effective_policy}'. "
+                "The value is valid but may disclose more referrer information than "
+                "more restrictive modern policies."
+            ),
+            remediation=(
+                "Consider using 'strict-origin-when-cross-origin', 'strict-origin', "
+                "'same-origin', or 'no-referrer'."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
+            raw_headers=raw,
+        )
+
     return None
 
+# Checks the Permissions-Policy header.
+
 def check_permissions_policy(headers: dict) -> Finding | None:
-    if "permissions-policy" not in headers:
+    raw = headers.get("permissions-policy")
+
+    if not raw:
         return Finding(
             id="permissions_policy_missing",
             title="Permissions-Policy Header Missing",
             severity=Severity.low,
             status=Status.fail,
             detail=(
-                "The Permissions-Policy header is missing. Without it, the browser may allow "
-                "certain powerful features (like geolocation, camera, microphone) to be used "
-                "by the site or embedded content without explicit restrictions."
+                "The Permissions-Policy header is missing. The application does not explicitly "
+                "restrict browser capabilities such as the camera, microphone, geolocation, "
+                "or their availability to embedded content."
             ),
             remediation=(
-                "Add a Permissions-Policy header to control which features are allowed. "
-                "For example: 'Permissions-Policy: geolocation=(self), microphone=()' "
-                "to restrict geolocation to the same origin and disable microphone access."
+                "Add a Permissions-Policy header appropriate for the application, such as "
+                "'camera=(), microphone=(), geolocation=(self)'."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy",
-            raw_headers=None
+            raw_headers=None,
         )
+
+    policies = {}
+
+    for section in raw.split(","):
+        section = section.strip()
+
+        if "=" not in section:
+            continue
+
+        feature, allowlist = section.split("=", 1)
+
+        policies[feature.strip().lower()] = allowlist.strip().lower()
+
+    sensitive_features = {
+        "camera",
+        "microphone",
+        "geolocation",
+    }
+
+    unrestricted = [
+        feature
+        for feature in sensitive_features
+        if policies.get(feature) == "*"
+    ]
+
+    if unrestricted:
+        return Finding(
+            id="permissions_policy_sensitive_wildcard",
+            title="Permissions-Policy Allows Sensitive Features From Any Origin",
+            severity=Severity.medium,
+            status=Status.fail,
+            detail=(
+                "Sensitive browser features are available to any origin: "
+                f"{', '.join(sorted(unrestricted))}. Embedded third-party content may therefore "
+                "receive broader access than intended."
+            ),
+            remediation=(
+                "Restrict sensitive capabilities to trusted origins or disable them. "
+                "For example: 'camera=(), microphone=(), geolocation=(self)'."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy",
+            raw_headers=raw,
+        )
+
     return None
+
+
 
 def analyze_headers(headers:dict) -> list[Finding]:
     Findings = []
