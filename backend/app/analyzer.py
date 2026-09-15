@@ -293,5 +293,68 @@ def check_frame_protection(headers: dict) -> Finding | None:
         )
 
     return None
+
+def check_referrer_policy(headers: dict) -> Finding | None:
+    if "referrer-policy" not in headers:
+        return Finding(
+            id="referrer_policy_missing",
+            title="Referrer-Policy Header Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=(
+                "The Referrer-Policy header is missing. Without it, browsers may send the full URL "
+                "of the current page as the Referer header when navigating to other sites. This can "
+                "potentially leak sensitive information such as authentication tokens or internal paths."
+            ),
+            remediation=(
+                "Add a Referrer-Policy header to control how much referrer information is sent. "
+                "A common choice is 'strict-origin-when-cross-origin', which sends the full URL "
+                "only for same-origin requests and only the origin for cross-origin requests."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
+            raw_headers=None
+        )
+    if headers["referrer-policy"].lower() not in ["no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "same-origin", "strict-origin", "strict-origin-when-cross-origin", "unsafe-url"]:
+        return Finding(
+            id="referrer_policy_invalid",
+            title="Referrer-Policy Header Invalid",
+            severity=Severity.medium,
+            status=Status.fail,
+            detail=(
+                f"The Referrer-Policy header uses the unsupported or ineffective value "
+                f"'{headers['referrer-policy']}'. This may lead to unexpected behavior "
+                "regarding the amount of referrer information sent."
+            ),
+            remediation=(
+                "Set the header to a valid value such as 'strict-origin-when-cross-origin' "
+                "to ensure proper handling of referrer information."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
+            raw_headers=headers["referrer-policy"]
+        )
+    return None
+
+def check_permissions_policy(headers: dict) -> Finding | None:
+    if "permissions-policy" not in headers:
+        return Finding(
+            id="permissions_policy_missing",
+            title="Permissions-Policy Header Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=(
+                "The Permissions-Policy header is missing. Without it, the browser may allow "
+                "certain powerful features (like geolocation, camera, microphone) to be used "
+                "by the site or embedded content without explicit restrictions."
+            ),
+            remediation=(
+                "Add a Permissions-Policy header to control which features are allowed. "
+                "For example: 'Permissions-Policy: geolocation=(self), microphone=()' "
+                "to restrict geolocation to the same origin and disable microphone access."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy",
+            raw_headers=None
+        )
+    return None
+
 def analyze_headers(headers:dict) -> list[Finding]:
     Findings = []
