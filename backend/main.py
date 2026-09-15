@@ -19,6 +19,11 @@ app = FastAPI()
 
 frontend_origins = os.getenv("FRONTEND_ORIGINS", "*").split(",")
 
+ANALYSIS_REMARKS = [
+	"Some missing security headers can be expected on simple static websites and may not indicate a real issue.",
+	"LODE analyzes security headers only; it is not a malicious-link scanner and does not determine whether a website or link is safe or malicious.",
+]
+
 app.add_middleware(
 	CORSMiddleware,
 	allow_origins=[origin.strip() for origin in frontend_origins if origin.strip()],
@@ -41,6 +46,7 @@ async def analyze_header_map(headers: dict, url: str | None) -> AnalysisResponse
 		score=summary.score,
 		summary=summary,
 		findings=findings,
+		remarks=ANALYSIS_REMARKS.copy(),
 	)
 
 

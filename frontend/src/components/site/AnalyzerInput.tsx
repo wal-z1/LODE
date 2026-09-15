@@ -99,6 +99,10 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 					? "Tip: HTTPS is recommended because it protects the connection while LODE checks the site."
 					: "Headers are short lines in the form: setting name: setting value. The example can be replaced."}
 			</p>
+			<p className="mt-2 text-xs leading-5 text-muted-foreground">
+				A missing header can be an expected choice on a simple static website,
+				so check each finding against how the site is built.
+			</p>
 		</form>
 	);
 }

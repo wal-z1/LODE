@@ -9,6 +9,10 @@ function HeroSection() {
 					Check the security settings a website sends to your browser. You will
 					get a score, a plain-language explanation, and practical next steps.
 				</p>
+				<p className="mx-auto mt-3 max-w-145 text-xs leading-5 text-muted-foreground">
+					LODE is a security-header analyzer, not a malicious-link scanner. It
+					does not determine whether a website or link is safe or malicious.
+				</p>
 			</div>
 			<div className="mx-auto mt-8 grid max-w-190 border-y border-border sm:grid-cols-3">
 				{[

@@ -193,6 +193,11 @@ function ResultsPanel({ result }: ResultsPanelProps) {
 				A passing check is already in place. A warning may need review. A failed
 				check includes a remediation you can expand.
 			</p>
+			<p className="mt-2 border-l-2 border-border pl-3 text-xs leading-5 text-muted-foreground">
+				Context matters: some missing headers are normal for static websites and
+				may not indicate a real issue. LODE checks headers only; it is not a
+				malicious-link scanner.
+			</p>
 		</section>
 	);
 }

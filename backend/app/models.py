@@ -40,3 +40,4 @@ class AnalysisResponse(BaseModel):
     score: float
     summary: AnalysisSummary
     findings: list[Finding]
+    remarks: list[str]
