@@ -46,6 +46,12 @@ function badgeClass(severity: Severity) {
 	return "border-primary/50 text-primary";
 }
 
+function statusLabel(status: Finding["status"]) {
+	if (status === "pass") return "Looks good";
+	if (status === "warn") return "Review suggested";
+	return "Needs attention";
+}
+
 function FindingRow({ finding }: { finding: Finding }) {
 	const [expanded, setExpanded] = useState(false);
 
@@ -58,7 +64,7 @@ function FindingRow({ finding }: { finding: Finding }) {
 				</span>
 				<span className="text-base font-medium">{finding.title}</span>
 				<span className="ml-auto text-[10px] uppercase text-muted-foreground">
-					{finding.status}
+					{statusLabel(finding.status)}
 				</span>
 			</div>
 			<p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -107,7 +113,10 @@ function ResultsPanel({ result }: ResultsPanelProps) {
 			<div className="grid gap-4 border-y border-border py-6 sm:grid-cols-[180px_1fr]">
 				<div>
 					<p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-						Security score
+						Security score{" "}
+						<span className="normal-case tracking-normal">
+							(higher is better)
+						</span>
 					</p>
 					<p
 						className={`mt-2 text-6xl font-medium leading-none ${scoreClass(result.score)}`}>
@@ -117,6 +126,10 @@ function ResultsPanel({ result }: ResultsPanelProps) {
 				<div>
 					<p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
 						Summary
+					</p>
+					<p className="mt-2 text-sm leading-6 text-muted-foreground">
+						These labels show how urgently each issue needs attention. Select a
+						label below to focus the list.
 					</p>
 					<div className="mt-3 flex flex-wrap gap-2">
 						{severityOrder.map((severity) => {
@@ -135,7 +148,10 @@ function ResultsPanel({ result }: ResultsPanelProps) {
 
 			<div className="mt-8 flex flex-wrap items-center gap-2">
 				<p className="mr-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
-					Findings
+					Findings{" "}
+					<span className="normal-case tracking-normal">
+						(what LODE noticed)
+					</span>
 				</p>
 				{["all", ...severityOrder].map((severity) => (
 					<Button
@@ -173,6 +189,10 @@ function ResultsPanel({ result }: ResultsPanelProps) {
 					) : null}
 				</CardContent>
 			</Card>
+			<p className="mt-3 text-xs leading-5 text-muted-foreground">
+				A passing check is already in place. A warning may need review. A failed
+				check includes a remediation you can expand.
+			</p>
 		</section>
 	);
 }

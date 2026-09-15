@@ -27,6 +27,15 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 
 	return (
 		<form onSubmit={handleSubmit} className="mx-auto mt-4 w-full max-w-190">
+			<div className="mb-4">
+				<p className="text-xs font-medium uppercase tracking-[0.12em]">
+					Start a check
+				</p>
+				<p className="mt-1 text-xs leading-5 text-muted-foreground">
+					Enter a public website to fetch its settings, or paste headers from a
+					response you already have.
+				</p>
+			</div>
 			<div className="mb-3 flex border-b border-border">
 				{(["url", "raw_headers"] as const).map((option) => (
 					<button
@@ -36,6 +45,7 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 							setMode(option);
 							setValue(option === "raw_headers" ? RAW_HEADERS_EXAMPLE : "");
 						}}
+						aria-selected={mode === option}
 						className={`border-b-2 px-2.5 py-2 text-xs uppercase tracking-[0.12em] transition-colors ${
 							mode === option
 								? "border-primary text-primary"
@@ -81,9 +91,14 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 				)}
 				<Button type="submit" disabled={loading || !value} className="h-9">
 					{loading ? <SpinnerGap className="animate-spin" /> : null}
-					{loading ? "ANALYZING" : "ANALYZE"}
+					{loading ? "CHECKING" : "CHECK SECURITY"}
 				</Button>
 			</div>
+			<p className="mt-3 text-xs leading-5 text-muted-foreground">
+				{mode === "url"
+					? "Tip: HTTPS is recommended because it protects the connection while LODE checks the site."
+					: "Headers are short lines in the form: setting name: setting value. The example can be replaced."}
+			</p>
 		</form>
 	);
 }
