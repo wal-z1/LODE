@@ -69,7 +69,7 @@ def check_hsts(headers: dict) -> Finding | None:
         )
 
     try:
-        max_age = int(directives["max-age"])
+        max_age = int(directives["max-age"] or 0)
     except (TypeError, ValueError):
         return Finding(
             id="hsts_max_age_invalid",
@@ -560,7 +560,241 @@ def check_permissions_policy(headers: dict) -> Finding | None:
 
     return None
 
+def check_cookies(headers: dict) -> list[Finding]:
+    findings = []
+    cookies = headers.get("set-cookie")
+
+    if not cookies:
+        return findings
+
+    if isinstance(cookies, str):
+        cookies = [cookies]
+
+    for cookie in cookies:
+        parts = [part.strip() for part in cookie.split(";")]
+        name = parts[0].split("=", 1)[0].strip()
+        attributes = {part.lower() for part in parts[1:]}
+
+        if "secure" not in attributes:
+            findings.append(
+                Finding(
+                    id=f"cookie_{name}_missing_secure",
+                    title=f"Cookie '{name}' Missing Secure Attribute",
+                    severity=Severity.medium,
+                    status=Status.fail,
+                    detail=(
+                        f"The cookie '{name}' does not have the 'Secure' attribute. "
+                        "Without it, the cookie may be transmitted over unencrypted HTTP connections."
+                    ),
+                    remediation="Add the 'Secure' attribute to the Set-Cookie header.",
+                    url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie",
+                    raw_headers=cookie,
+                )
+            )
+
+        if "httponly" not in attributes:
+            findings.append(
+                Finding(
+                    id=f"cookie_{name}_missing_httponly",
+                    title=f"Cookie '{name}' Missing HttpOnly Attribute",
+                    severity=Severity.medium,
+                    status=Status.fail,
+                    detail=(
+                        f"The cookie '{name}' does not have the 'HttpOnly' attribute. "
+                        "Without it, client-side scripts may access the cookie, increasing the risk of XSS attacks."
+                    ),
+                    remediation="Add the 'HttpOnly' attribute to the Set-Cookie header.",
+                    url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie",
+                    raw_headers=cookie,
+                )
+            )
+
+    return findings
 
 
-def analyze_headers(headers:dict) -> list[Finding]:
-    Findings = []
+def check_cors(headers: dict) -> Finding | None:
+    if "access-control-allow-origin" not in headers:
+        return Finding(
+            id="cors_missing",
+            title="CORS Header Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=(
+                "The Access-Control-Allow-Origin header is missing. "
+                "Without it, cross-origin requests may be blocked by browsers, "
+                "but the application does not explicitly define its CORS policy."
+            ),
+            remediation=(
+                "Add an appropriate Access-Control-Allow-Origin header to define the CORS policy."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS",
+            raw_headers=None,
+        )
+    if "allow-control-allow-credentials" in headers and headers.get("access-control-allow-origin") == "*":
+        return Finding(
+            id="cors_wildcard_with_credentials",
+            title="CORS Allows Any Origin With Credentials",
+            severity=Severity.high,
+            status=Status.fail,
+            detail=(
+                "The Access-Control-Allow-Origin header is set to '*', allowing any origin, "
+                "while Access-Control-Allow-Credentials is also present. "
+                "This combination allows cross-origin requests with credentials from any origin, "
+                "which can lead to security vulnerabilities."
+            ),
+            remediation=(
+                "Set Access-Control-Allow-Origin to a specific trusted origin when using credentials."
+            ),
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS",
+            raw_headers=None,
+        )
+
+
+def check_server_header(headers: dict) -> Finding | None:
+    value = headers.get("server")
+
+    if value:
+        return Finding(
+            id="server_header_disclosure",
+            title="Server Header Exposes Server Information",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=f"The Server header exposes server information: '{value}'.",
+            remediation="Remove or minimize the Server header.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Server",
+            raw_headers=value,
+        )
+
+
+def check_powered_by(headers: dict) -> Finding | None:
+    value = headers.get("x-powered-by")
+
+    if value:
+        return Finding(
+            id="powered_by_disclosure",
+            title="X-Powered-By Header Exposes Technology",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=f"The X-Powered-By header exposes backend technology: '{value}'.",
+            remediation="Remove the X-Powered-By header.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers",
+            raw_headers=value,
+        )
+
+
+def check_aspnet_version(headers: dict) -> Finding | None:
+    value = headers.get("x-aspnet-version")
+
+    if value:
+        return Finding(
+            id="aspnet_version_disclosure",
+            title="ASP.NET Version Exposed",
+            severity=Severity.low,
+            status=Status.fail,
+            detail=f"The X-AspNet-Version header exposes ASP.NET version information: '{value}'.",
+            remediation="Disable the X-AspNet-Version header.",
+            url="https://learn.microsoft.com/en-us/aspnet/",
+            raw_headers=value,
+        )
+
+
+def check_coop(headers: dict) -> Finding | None:
+    if "cross-origin-opener-policy" not in headers:
+        return Finding(
+            id="coop_missing",
+            title="Cross-Origin-Opener-Policy Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail="The Cross-Origin-Opener-Policy header is missing.",
+            remediation="Consider using 'Cross-Origin-Opener-Policy: same-origin'.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy",
+            raw_headers=None,
+        )
+
+
+def check_coep(headers: dict) -> Finding | None:
+    if "cross-origin-embedder-policy" not in headers:
+        return Finding(
+            id="coep_missing",
+            title="Cross-Origin-Embedder-Policy Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail="The Cross-Origin-Embedder-Policy header is missing.",
+            remediation="Consider using 'Cross-Origin-Embedder-Policy: require-corp'.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy",
+            raw_headers=None,
+        )
+
+
+def check_corp(headers: dict) -> Finding | None:
+    if "cross-origin-resource-policy" not in headers:
+        return Finding(
+            id="corp_missing",
+            title="Cross-Origin-Resource-Policy Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail="The Cross-Origin-Resource-Policy header is missing.",
+            remediation="Consider using 'same-origin' or 'same-site'.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Resource-Policy",
+            raw_headers=None,
+        )
+
+
+def check_cache_control(headers: dict) -> Finding | None:
+    if "cache-control" not in headers:
+        return Finding(
+            id="cache_control_missing",
+            title="Cache-Control Header Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail="The Cache-Control header is missing.",
+            remediation="Define an appropriate caching policy.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control",
+            raw_headers=None,
+        )
+
+
+def check_content_type(headers: dict) -> Finding | None:
+    if "content-type" not in headers:
+        return Finding(
+            id="content_type_missing",
+            title="Content-Type Header Missing",
+            severity=Severity.low,
+            status=Status.fail,
+            detail="The Content-Type header is missing.",
+            remediation="Set the correct Content-Type for the response.",
+            url="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type",
+            raw_headers=None,
+        )
+
+def analyze_headers(headers: dict) -> list[Finding]:
+    findings = []
+
+    checks = [
+        check_hsts,
+        check_csp,
+        check_content_type_options,
+        check_frame_protection,
+        check_referrer_policy,
+        check_permissions_policy,
+        check_cookies,
+        check_cors,
+        check_server_header,
+        check_powered_by,
+        check_aspnet_version,
+        check_coop,
+        check_coep,
+        check_corp,
+        check_cache_control,
+        check_content_type,
+    ]
+
+    for check in checks:
+        result = check(headers)
+
+        if isinstance(result, list):
+            findings.extend(result)
+        elif result is not None:
+            findings.append(result)
+
+    return findings
