@@ -39,7 +39,6 @@ function scoreTone(score: number) {
 	};
 }
 
-
 function ResultsPanel({ result }: ResultsPanelProps) {
 	const [filter, setFilter] = useState<Severity | "all">("all");
 
