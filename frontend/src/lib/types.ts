@@ -25,6 +25,7 @@ export interface AnalysisResponse {
 	score: number;
 	summary: AnalysisSummary;
 	findings: Finding[];
+	remarks: string[];
 }
 
 export type AnalyzePayload = { url: string } | { raw_headers: string };

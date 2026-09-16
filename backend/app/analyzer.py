@@ -688,11 +688,13 @@ def check_cors(headers: dict) -> Finding | None:
             status=Status.fail,
             detail=(
                 "The Access-Control-Allow-Origin header is missing. "
-                "Without it, cross-origin requests may be blocked by browsers, "
-                "but the application does not explicitly define its CORS policy."
+                "This is not inherently a vulnerability if the application does not need "
+                "cross-origin browser access. It simply means the site does not explicitly "
+                "define a CORS policy."
             ),
             remediation=(
-                "Add an appropriate Access-Control-Allow-Origin header to define the CORS policy."
+                "Add a CORS policy only when the application intentionally supports trusted cross-origin requests. "
+                "If cross-origin access is not required, leaving the header unset is a reasonable default."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS",
             raw_headers=None,
@@ -701,17 +703,17 @@ def check_cors(headers: dict) -> Finding | None:
         return Finding(
             id="cors_wildcard_with_credentials",
             control="cors",
-            title="CORS Allows Any Origin With Credentials",
+            title="CORS Wildcard With Credentials Is Incompatible",
             severity=Severity.high,
             status=Status.fail,
             detail=(
-                "The Access-Control-Allow-Origin header is set to '*', allowing any origin, "
-                "while Access-Control-Allow-Credentials is also present. "
-                "This combination allows cross-origin requests with credentials from any origin, "
-                "which can lead to security vulnerabilities."
+                "The response sets Access-Control-Allow-Origin to '*' while also sending "
+                "Access-Control-Allow-Credentials: true. Browsers reject that credentialed CORS "
+                "configuration; it is an incompatible setup, not a safe allow-any-with-credentials pattern."
             ),
             remediation=(
-                "Set Access-Control-Allow-Origin to a specific trusted origin when using credentials."
+                "Use a single trusted origin in Access-Control-Allow-Origin when credentials are required, "
+                "and set Access-Control-Allow-Credentials: true only for that specific origin."
             ),
             url="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS",
             raw_headers=None,
