@@ -1,17 +1,20 @@
 import { useRef, useState } from "react";
-import { HeroSection } from "@/components/site/HeroSection";
-import { SiteHeader } from "@/components/site/SiteHeader";
-import { SiteFooter } from "@/components/site/SiteFooter";
+
 import { AnalyzerInput } from "@/components/site/AnalyzerInput";
+import { HeroSection } from "@/components/site/HeroSection";
 import { ResultsLoading, ResultsPanel } from "@/components/site/ResultsPanel";
+import { SiteFooter } from "@/components/site/SiteFooter";
+import { SiteHeader } from "@/components/site/SiteHeader";
 import { analyze } from "@/lib/api";
 import type { AnalysisMode, AnalysisResponse } from "@/lib/types";
 
 function App() {
 	const [isLight, setIsLight] = useState(false);
+	const [inputActive, setInputActive] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [result, setResult] = useState<AnalysisResponse | null>(null);
+
 	const resultsRef = useRef<HTMLDivElement>(null);
 
 	function toggleTheme() {
@@ -21,27 +24,28 @@ function App() {
 	async function handleAnalyze(mode: AnalysisMode, value: string) {
 		if (!value) {
 			setError(
-				mode === "url"
-					? "Enter a URL to analyze."
-					: "Paste response headers to analyze.",
+				mode === "url" ? "Enter a website address." : "Paste response headers.",
 			);
 			return;
 		}
 
 		setLoading(true);
 		setError(null);
+		setResult(null);
 
 		try {
 			const response = await analyze(
 				mode === "url" ? { url: value } : { raw_headers: value },
 			);
+
 			setResult(response);
-			window.requestAnimationFrame(() =>
+
+			window.requestAnimationFrame(() => {
 				resultsRef.current?.scrollIntoView({
 					behavior: "smooth",
 					block: "start",
-				}),
-			);
+				});
+			});
 		} catch (requestError) {
 			setError(
 				requestError instanceof Error
@@ -53,6 +57,8 @@ function App() {
 		}
 	}
 
+	const compactHero = inputActive || loading || Boolean(result);
+
 	return (
 		<div
 			className={`${isLight ? "light" : ""} min-h-screen bg-background text-foreground transition-colors duration-200`}>
@@ -60,9 +66,15 @@ function App() {
 
 			<main
 				id="top"
-				className="mx-auto w-[calc(100%-48px)] max-w-280 pt-26 max-sm:w-[calc(100%-32px)] max-sm:pt-18">
-				<HeroSection />
-				<AnalyzerInput loading={loading} onSubmit={handleAnalyze} />
+				className="mx-auto w-[calc(100%-48px)] max-w-280 pt-16 max-sm:w-[calc(100%-32px)] max-sm:pt-10">
+				<HeroSection compact={compactHero} />
+
+				<AnalyzerInput
+					loading={loading}
+					onSubmit={handleAnalyze}
+					onActiveChange={setInputActive}
+				/>
+
 				{error ? (
 					<p
 						role="alert"
@@ -70,13 +82,15 @@ function App() {
 						{error}
 					</p>
 				) : null}
+
 				{loading || result ? (
-					<div ref={resultsRef}>
+					<div ref={resultsRef} className="scroll-mt-6">
 						{loading ? <ResultsLoading /> : null}
 						{!loading && result ? <ResultsPanel result={result} /> : null}
 					</div>
 				) : null}
 			</main>
+
 			<SiteFooter />
 		</div>
 	);

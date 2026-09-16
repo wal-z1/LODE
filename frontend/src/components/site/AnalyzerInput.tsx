@@ -1,5 +1,10 @@
-import { useState, type FormEvent } from "react";
+import {
+	useState,
+	type FocusEvent,
+	type FormEvent,
+} from "react";
 import { SpinnerGap } from "@phosphor-icons/react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AnalysisMode } from "@/lib/types";
@@ -11,47 +16,64 @@ Content-Security-Policy: default-src 'self'`;
 interface AnalyzerInputProps {
 	loading: boolean;
 	onSubmit: (mode: AnalysisMode, value: string) => void;
+	onActiveChange: (active: boolean) => void;
 }
 
-function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
+function AnalyzerInput({
+	loading,
+	onSubmit,
+	onActiveChange,
+}: AnalyzerInputProps) {
 	const [mode, setMode] = useState<AnalysisMode>("url");
 	const [value, setValue] = useState("");
 	const [scheme, setScheme] = useState<"http" | "https">("https");
 
 	function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
+
 		const input = value.trim();
+
+		if (mode === "raw_headers") {
+			onSubmit(mode, input);
+			return;
+		}
+
 		const url = input.replace(/^https?:\/\//i, "");
-		onSubmit(mode, mode === "url" ? `${scheme}://${url}` : input);
+		onSubmit(mode, `${scheme}://${url}`);
+	}
+
+	function handleBlur(event: FocusEvent<HTMLFormElement>) {
+		const nextTarget = event.relatedTarget as Node | null;
+
+		if (!event.currentTarget.contains(nextTarget)) {
+			onActiveChange(false);
+		}
+	}
+
+	function changeMode(nextMode: AnalysisMode) {
+		setMode(nextMode);
+		setValue(nextMode === "raw_headers" ? RAW_HEADERS_EXAMPLE : "");
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="mx-auto mt-4 w-full max-w-190">
-			<div className="mb-4">
-				<p className="text-xs font-medium uppercase tracking-[0.12em]">
-					Start a check
-				</p>
-				<p className="mt-1 text-xs leading-5 text-muted-foreground">
-					Enter a public website to fetch its settings, or paste headers from a
-					response you already have.
-				</p>
-			</div>
-			<div className="mb-3 flex border-b border-border">
+		<form
+			onSubmit={handleSubmit}
+			onFocusCapture={() => onActiveChange(true)}
+			onBlurCapture={handleBlur}
+			className="mx-auto w-full max-w-190">
+			<div className="mb-2 flex border-b border-border">
 				{(["url", "raw_headers"] as const).map((option) => (
 					<button
 						key={option}
 						type="button"
-						onClick={() => {
-							setMode(option);
-							setValue(option === "raw_headers" ? RAW_HEADERS_EXAMPLE : "");
-						}}
-						aria-selected={mode === option}
-						className={`border-b-2 px-2.5 py-2 text-xs uppercase tracking-[0.12em] transition-colors ${
+						onClick={() => changeMode(option)}
+						aria-pressed={mode === option}
+						className={`border-b-2 px-2.5 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
 							mode === option
 								? "border-primary text-primary"
 								: "border-transparent text-muted-foreground hover:text-foreground"
 						}`}>
-						{option === "url" ? "URL" : "RAW HEADERS"}
+						{option === "url" ? "Website" : "Raw headers"}
 					</button>
 				))}
 			</div>
@@ -66,18 +88,21 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 							}
 							aria-label="URL scheme"
 							disabled={loading}
-							className="h-9 border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50">
+							className="h-10 border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50">
 							<option value="https">https://</option>
 							<option value="http">http://</option>
 						</select>
+
 						<Input
 							value={value}
 							onChange={(event) => setValue(event.target.value)}
 							type="text"
+							inputMode="url"
+							autoComplete="url"
 							placeholder="example.com"
 							aria-label="Website address"
 							disabled={loading}
-							className="h-9 flex-1"
+							className="h-10 min-w-0 flex-1"
 						/>
 					</>
 				) : (
@@ -86,23 +111,27 @@ function AnalyzerInput({ loading, onSubmit }: AnalyzerInputProps) {
 						onChange={(event) => setValue(event.target.value)}
 						aria-label="Raw response headers"
 						disabled={loading}
-						className="min-h-24 flex-1 resize-y border border-input bg-transparent px-2.5 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50"
+						className="min-h-24 flex-1 resize-y border border-input bg-transparent px-2.5 py-2 font-mono text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50"
 					/>
 				)}
-				<Button type="submit" disabled={loading || !value} className="h-9">
+
+				<Button
+					type="submit"
+					disabled={loading || !value.trim()}
+					className="h-10 shrink-0">
 					{loading ? <SpinnerGap className="animate-spin" /> : null}
-					{loading ? "CHECKING" : "CHECK SECURITY"}
+					{loading ? "CHECKING" : "CHECK HEADERS"}
 				</Button>
 			</div>
-			<p className="mt-3 text-xs leading-5 text-muted-foreground">
-				{mode === "url"
-					? "Tip: HTTPS is recommended because it protects the connection while LODE checks the site."
-					: "Headers are short lines in the form: setting name: setting value. The example can be replaced."}
-			</p>
-			<p className="mt-2 text-xs leading-5 text-muted-foreground">
-				A missing header can be an expected choice on a simple static website,
-				so check each finding against how the site is built.
-			</p>
+
+			<div className="mt-2 flex flex-wrap items-center gap-x-2 text-[10px] leading-5 text-muted-foreground">
+				<span>Checks HTTP response configuration only.</span>
+				<span className="hidden sm:inline">·</span>
+				<span>
+					Does not determine whether a website, link, or downloaded content is
+					malicious.
+				</span>
+			</div>
 		</form>
 	);
 }

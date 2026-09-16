@@ -223,6 +223,10 @@ const catalog: Record<string, FindingExplanation> = {
 			"The browser decides how much URL information to send when a visitor follows a link.",
 		developer:
 			"Modern browsers have restrictive defaults, but an explicit policy makes behavior predictable and auditable. The right choice depends on analytics, privacy, and cross-origin navigation requirements.",
+		whenToWorry:
+			"Worry if URLs may contain identifiers or sensitive values, or if the application needs predictable privacy behavior across browsers.",
+		whenNotToWorry:
+			"Do not worry if modern browser defaults are acceptable and the site's URLs do not contain sensitive path or query information.",
 		example: headerExamples.referrerPolicy,
 	},
 	referrer_policy_invalid: {
@@ -250,6 +254,10 @@ const catalog: Record<string, FindingExplanation> = {
 			"The response does not explicitly limit powerful browser features.",
 		developer:
 			"Permissions-Policy controls access to features such as camera, microphone, and geolocation, including in embedded content. Absence is not automatically a vulnerability; choose restrictions based on the application's feature set.",
+		whenToWorry:
+			"Worry if the application uses sensitive browser features, embeds third-party content, or needs explicit control over which origins may access those features.",
+		whenNotToWorry:
+			"Do not worry if the site is a simple static page or portfolio that does not use sensitive browser features or expose them through embedded content.",
 		example: headerExamples.permissionsPolicy,
 	},
 	permissions_policy_sensitive_wildcard: {
@@ -301,6 +309,10 @@ const catalog: Record<string, FindingExplanation> = {
 			"The browser is not given a cross-origin opener isolation boundary.",
 		developer:
 			"COOP is useful for applications that need cross-origin isolation or stronger window separation. It can change popup and window.opener behavior, so its value depends on the application's navigation design.",
+		whenToWorry:
+			"Worry if the application requires cross-origin isolation, uses isolation-dependent browser APIs, or needs strict separation from windows opened on other origins.",
+		whenNotToWorry:
+			"Do not worry if the site is a normal static site, portfolio, or application that does not require cross-origin isolation.",
 		example: headerExamples.coop,
 	},
 	coep_missing: {
@@ -308,6 +320,10 @@ const catalog: Record<string, FindingExplanation> = {
 			"The browser is not told to require cross-origin resources to be explicitly loadable.",
 		developer:
 			"COEP is only needed when the application requires cross-origin isolation. It can break third-party resources that do not send suitable CORS or CORP headers, so test the full resource graph before enabling it.",
+		whenToWorry:
+			"Worry if the application intentionally requires cross-origin isolation or browser features that depend on it.",
+		whenNotToWorry:
+			"Do not worry if the site has no cross-origin isolation requirement. Adding COEP unnecessarily can break legitimate third-party images, fonts, scripts, and embeds.",
 		example: headerExamples.coep,
 	},
 	corp_missing: {
@@ -315,6 +331,10 @@ const catalog: Record<string, FindingExplanation> = {
 			"The response does not state which origins may load this resource.",
 		developer:
 			"CORP helps prevent unwanted cross-origin reads of a resource. Choose same-origin, same-site, or cross-origin according to the application's legitimate loading relationships.",
+		whenToWorry:
+			"Worry if resources should only be consumed by specific origins or the application is implementing cross-origin isolation.",
+		whenNotToWorry:
+			"Do not worry if the resource is intentionally public and is expected to be loaded by other origins.",
 		example: headerExamples.corp,
 	},
 	cache_control_missing: {
@@ -322,6 +342,10 @@ const catalog: Record<string, FindingExplanation> = {
 			"The response does not state how browsers or intermediaries should cache it.",
 		developer:
 			"Caching requirements depend on sensitivity and freshness. Use no-store for private or sensitive data, and use explicit public max-age or immutable directives only for resources safe to cache.",
+		whenToWorry:
+			"Worry if the response contains private, authenticated, sensitive, or frequently changing information that should not be retained.",
+		whenNotToWorry:
+			"Do not worry if the response is public static content and its caching behavior is already appropriate for how the site is deployed.",
 		example: headerExamples.cacheControl,
 	},
 	content_type_missing: {
